@@ -1,0 +1,8 @@
+*.o
+*.hi
+*.html
+*.json
+cabal.sandbox.config
+.cabal-sandbox/
+*~
+dist/
