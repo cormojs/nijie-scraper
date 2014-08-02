@@ -2,7 +2,7 @@
 --  see http://haskell.org/cabal/users-guide/
 
 name:                Nijie
-version:             0.1.0.0
+version:             0.2.0.0
 -- synopsis:            
 -- description:         
 license:             MIT
@@ -17,8 +17,13 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:   Web.Nijie
+                   , Web.Nijie.JSON
+                   , Web.Nijie.Login
+                   , Web.Nijie.Parser
+                   , Web.Nijie.Types
   -- other-modules:       
-  -- other-extensions:    
-  build-depends:       base >=4.6 && <4.7, mtl, time, HTTP, text, bytestring, resourcet, conduit, conduit-extra, http-conduit, html-conduit, xml-conduit, blaze-html, unix-time, http-types, http-client, aeson, aeson-pretty, utf8-string, regex-posix
+  default-extensions:    OverloadedStrings
+  other-extensions:    OverloadedStrings
+  build-depends:       base >=4.6 && <4.7, mtl, time, HTTP, text, bytestring, resourcet, conduit, conduit-extra, http-conduit, html-conduit, xml-conduit, blaze-html, unix-time, http-types, http-client, aeson, aeson-pretty, utf8-string, regex-posix, filepath, directory
   -- hs-source-dirs:      
   default-language:    Haskell2010
