@@ -1,4 +1,7 @@
-module Web.Nijie.Types where
+module Web.Nijie.Types
+       ( NjeUser(..)
+       , NjeKind(..)
+       , NjeLink(..) ) where
 
 import Data.ByteString (ByteString)
 
