@@ -59,3 +59,38 @@ njeCursorToNjeLink cursor =
           ["同人"] -> NjeDoujin
           ["漫画"] -> NjeManga
           _       -> NjeSingle
+
+-- njeBookmarkCursorToNjeLink :: XMLC.Cursor -> NjeLink
+njeBookmarkCursorToNjeLink cursor =
+  let [dao]   = cursor $// XMLC.attributeIs "class" "nijiedao"
+      kImg    = cursor $// XMLC.attributeIs "class" "thumbnail-icon"
+                       &// XMLC.element "img"
+      [authP] = cursor $// XMLC.attributeIs "class" "kazu"
+      [authA] = authP  $// XMLC.element "a"
+      [tleP]  = cursor $// XMLC.attributeIs "class" "title"
+      title = case XMLC.child tleP of
+        [s] -> s
+        (_:s:_) -> s
+      [auId] = XMLC.attribute "href" authA
+      [auName]  = concatMap XMLC.content $ XMLC.child authA
+      [link]  = dao $// XMLC.element "a"
+      [url]   = XMLC.attribute "href" link
+      [thImg] = dao $// XMLC.element "img"
+      [thUrl] = XMLC.attribute "src" thImg
+  in NjeLink { njeId = toId url
+             , njeThumbUrl = toThUrl thUrl
+             , njeTitle    = TextEnc.encodeUtf8 $ head $ XMLC.content title
+             , njeAuthor   = NjeUser (TextEnc.encodeUtf8 auName) (toAuId auId)
+             , njeKind     = toKind kImg }
+  where pattern = "([0-9]+)" :: ByteString
+        toId text   = TextEnc.encodeUtf8 text =~ pattern
+        toAuId text = TextEnc.encodeUtf8 text =~ pattern
+        toThUrl = ("http:"++) . Text.unpack
+        toKind []     = NjeSingle
+        toKind [kImg] = case XMLC.attribute "alt" kImg of
+          ["同人"] -> NjeDoujin
+          ["漫画"] -> NjeManga
+          _       -> NjeSingle
+        render :: [XMLC.Cursor] -> TextL.Text
+        render cs = TextL.concat $ map (renderHtml . BlazeHtml.toHtml . XMLC.node) cs
+
