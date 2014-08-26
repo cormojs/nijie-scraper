@@ -23,19 +23,103 @@ import qualified Codec.Binary.UTF8.String   as UTF8Codec
 
 -- text
 import Data.Text  (Text)
-import qualified Data.Text        as Text
-import qualified Data.Text.IO     as TextIO
-import qualified Data.Text.Encoding as TextEnc
+import qualified Data.Text             as Text
+import qualified Data.Text.IO          as TextIO
+import qualified Data.Text.Encoding    as TextEnc
 import qualified Data.Text.Lazy        as TextL
 import qualified Data.Text.Lazy.IO     as TextLIO
 
 
+-- Control
+import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans as Trans
+import Control.Applicative ((<$>))
 
-njeCursorToNjeLink :: XMLC.Cursor -> NjeLink
-njeCursorToNjeLink cursor =
+
+test = do
+  doc <- HTML.readFile "out.html"
+  print $ njeTagsFromDoc doc
+  -- Monad.forM_ s $ print . njeId
+
+njeTagsFromDoc :: XML.Document -> [ByteString]
+njeTagsFromDoc doc =
+  let s = XMLC.fromDocument doc
+          $// XMLC.attributeIs "id" "view-tag"
+          &// XMLC.attributeIs "class" "tag"
+          &// XMLC.attributeIs "class" "tag_name"
+  in map (TextEnc.encodeUtf8 . toTagName) s
+  where toTagName s =
+          let (e:_) = s $// XMLC.element "a"
+          in head $ XMLC.child e >>= XMLC.content
+
+njeLinksFromThumbs :: NjeAPI -> XML.Document -> [NjeLink]
+njeLinksFromThumbs api doc = go api
+  where go (NjeLike _) = map njeLikeCursorToNjeLink $ cursor
+                         $// XMLC.attributeIs "id" "main-left-main"
+                         &// XMLC.attributeIs "class" "nijie"
+        go (NjeFav _)  = map njeBookmarkCursorToNjeLink $ cursor
+                         $// XMLC.attributeIs "id"    "main"
+                         &// XMLC.attributeIs "class" "main-left2"
+                         &// XMLC.attributeIs "class" "nijie-bookmark nijie"
+        go (NjeRank _) = map njeOkazuCursorToNjeLink $ cursor
+                         $// XMLC.attributeIs "id" "okazu_list"
+                         &// XMLC.element "a"
+        go (NjeUserIllust user) = map (njeUserIllustCursorToNjeLink user) $ cursor
+                                  $// XMLC.attributeIs "class" "mem-index clearboth"
+                                  &// XMLC.attributeIs "class" "nijie"
+        go (NjeUserBookmark user) = map (njeUserIllustCursorToNjeLink empty) $ cursor
+                                    $// XMLC.attributeIs "class" "mem-index clearboth"
+                                    &// XMLC.attributeIs "class" "nijie"
+          where empty = NjeUser "" "-1"
+        go (NjeUserNuita _)    = map njeLikeCursorToNjeLink $ cursor
+                                 $// XMLC.attributeIs "id" "main-left-main"
+                                 &// XMLC.attributeIs "class" "nijie"
+        go (NjeSearch _ _ _) = map njeLikeCursorToNjeLink $ cursor
+                               $// XMLC.attributeIs "id" "main-left-main"
+                               &// XMLC.attributeIs "class" "nijie"
+        cursor = XMLC.fromDocument doc
+
+
+toUserId text   = TextEnc.encodeUtf8 text =~ pattern
+  where pattern = "([0-9]+)" :: ByteString
+
+toAuthorId :: Text -> ByteString
+toAuthorId text = TextEnc.encodeUtf8 text =~ pattern
+  where pattern = "([0-9]+)" :: ByteString
+
+toThumbUrl = ("http:"++) . Text.unpack
+
+toNjeKind []     = NjeSingle
+toNjeKind [kImg] = case XMLC.attribute "alt" kImg of
+  ["同人"] -> NjeDoujin
+  ["漫画"] -> NjeManga
+  _        -> NjeSingle
+
+
+njeUserIllustCursorToNjeLink author cursor =
   let [dao]   = cursor $// XMLC.attributeIs "class" "nijiedao"
       kImg    = cursor $// XMLC.attributeIs "class" "thumbnail-icon"
                        &// XMLC.element "img"
+      kAnime  = cursor $// XMLC.attributeIs "class" "thumbnail-anime-icon"
+      [link]  = dao $// XMLC.element "a"
+      [thImg] = dao $// XMLC.element "img"
+      [title] = XMLC.attribute "title" link
+      [url]   = XMLC.attribute "href" link
+      [thUrl] = XMLC.attribute "src" thImg
+  in NjeLink { njeId = toUserId url
+             , njeThumbUrl = toThumbUrl thUrl
+             , njeTitle    = TextEnc.encodeUtf8 title
+             , njeAuthor   = author
+             , njeKind     = toNjeKind kImg
+             , njeIsAnime  = not $ null kAnime }
+
+
+njeLikeCursorToNjeLink :: XMLC.Cursor -> NjeLink
+njeLikeCursorToNjeLink cursor =
+  let [dao]   = cursor $// XMLC.attributeIs "class" "nijiedao"
+      kImg    = cursor $// XMLC.attributeIs "class" "thumbnail-icon"
+                       &// XMLC.element "img"
+      anime   = cursor $// XMLC.attributeIs "class" "thumbnail-anime-icon"
       [auSpn] = cursor $// XMLC.attributeIs "itemprop" "author"
       [auIdA] = XMLC.parent auSpn
       [link]  = dao $// XMLC.element "a"
@@ -45,26 +129,20 @@ njeCursorToNjeLink cursor =
       [thUrl] = XMLC.attribute "src" thImg
       [auN]   = XMLC.content $ head $ XMLC.child auSpn
       [auId]  = XMLC.attribute "href" auIdA
-  in NjeLink { njeId = toId url
-             , njeThumbUrl = toThUrl thUrl
+  in NjeLink { njeId = toUserId url
+             , njeThumbUrl = toThumbUrl thUrl
              , njeTitle    = TextEnc.encodeUtf8 title
-             , njeAuthor   = NjeUser (TextEnc.encodeUtf8 auN) (toAuId auId)
-             , njeKind     = toKind kImg }
-  where pattern = "([0-9]+)" :: ByteString
-        toId text   = TextEnc.encodeUtf8 text =~ pattern
-        toAuId text = TextEnc.encodeUtf8 text =~ pattern
-        toThUrl = ("http:"++) . Text.unpack
-        toKind []     = NjeSingle
-        toKind [kImg] = case XMLC.attribute "alt" kImg of
-          ["同人"] -> NjeDoujin
-          ["漫画"] -> NjeManga
-          _       -> NjeSingle
+             , njeAuthor   = NjeUser (TextEnc.encodeUtf8 auN) (toAuthorId auId)
+             , njeKind     = toNjeKind kImg
+             , njeIsAnime  = not $ null anime }
 
--- njeBookmarkCursorToNjeLink :: XMLC.Cursor -> NjeLink
+njeBookmarkCursorToNjeLink :: XMLC.Cursor -> NjeLink
 njeBookmarkCursorToNjeLink cursor =
-  let [dao]   = cursor $// XMLC.attributeIs "class" "nijiedao"
+  let [dao]   = cursor $// XMLC.attributeIs "class" "picture"
+                       &// XMLC.attributeIs "class" "nijiedao"
       kImg    = cursor $// XMLC.attributeIs "class" "thumbnail-icon"
                        &// XMLC.element "img"
+      kAnime  = cursor $// XMLC.attributeIs "class" "thumbnail-anime-icon"
       [authP] = cursor $// XMLC.attributeIs "class" "kazu"
       [authA] = authP  $// XMLC.element "a"
       [tleP]  = cursor $// XMLC.attributeIs "class" "title"
@@ -77,20 +155,35 @@ njeBookmarkCursorToNjeLink cursor =
       [url]   = XMLC.attribute "href" link
       [thImg] = dao $// XMLC.element "img"
       [thUrl] = XMLC.attribute "src" thImg
-  in NjeLink { njeId = toId url
-             , njeThumbUrl = toThUrl thUrl
+  in NjeLink { njeId = toUserId url
+             , njeThumbUrl = toThumbUrl thUrl
              , njeTitle    = TextEnc.encodeUtf8 $ head $ XMLC.content title
-             , njeAuthor   = NjeUser (TextEnc.encodeUtf8 auName) (toAuId auId)
-             , njeKind     = toKind kImg }
-  where pattern = "([0-9]+)" :: ByteString
-        toId text   = TextEnc.encodeUtf8 text =~ pattern
-        toAuId text = TextEnc.encodeUtf8 text =~ pattern
-        toThUrl = ("http:"++) . Text.unpack
-        toKind []     = NjeSingle
-        toKind [kImg] = case XMLC.attribute "alt" kImg of
-          ["同人"] -> NjeDoujin
-          ["漫画"] -> NjeManga
-          _       -> NjeSingle
-        render :: [XMLC.Cursor] -> TextL.Text
-        render cs = TextL.concat $ map (renderHtml . BlazeHtml.toHtml . XMLC.node) cs
+             , njeAuthor   = NjeUser (TextEnc.encodeUtf8 auName) (toAuthorId auId)
+             , njeKind     = toNjeKind kImg
+             , njeIsAnime  = not $ null kAnime }
 
+njeOkazuCursorToNjeLink :: XMLC.Cursor -> NjeLink
+njeOkazuCursorToNjeLink link =
+  let id = head $ XMLC.attribute "href" link
+      [titleC] = link $// XMLC.attributeIs "class" "rank"
+                      &// XMLC.attributeIs "class" "set-rank-right"
+                      &// XMLC.attributeIs "class" "rank-left2"
+      [thumbs] = link $// XMLC.attributeIs "class" "rank"
+                      &// XMLC.attributeIs "class" "set-rank-left"
+                      &// XMLC.attributeIs "class" "thumbnail-block"
+                      &// XMLC.attributeIs "class" "rank-left"
+                      &// XMLC.attributeIs "itemprop" "image"
+      [title]  = XMLC.content =<< XMLC.child =<< titleC $// XMLC.element "strong"
+      [author] = XMLC.content =<< XMLC.child titleC
+      kind = link
+             $// XMLC.attributeIs "class" "okazu-thumbnail-icon"
+             &// XMLC.element "img"
+      anime = link
+              $// XMLC.attributeIs "class" "okazu-thumbnail-anime-icon"
+  in NjeLink { njeId       = toUserId id
+             , njeThumbUrl = toThumbUrl $ head $ XMLC.attribute "src" thumbs
+             , njeTitle    = TextEnc.encodeUtf8 title
+             , njeAuthor   = NjeUser (TextEnc.encodeUtf8 $ Text.drop 4 author)
+                                     "-1"
+             , njeKind     = toNjeKind kind
+             , njeIsAnime  = not $ null anime }

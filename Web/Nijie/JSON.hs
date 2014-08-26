@@ -1,6 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Web.Nijie.JSON where
 
+-- internal
+import Web.Nijie.Types
+
 -- http
 import Network.HTTP.Conduit (Cookie(), CookieJar())
 
@@ -25,6 +28,8 @@ instance Aeson.ToJSON ByteString where
 
 $(deriveJSON defaultOptions ''Cookie)
 $(deriveJSON defaultOptions ''CookieJar)
+
+$(deriveJSON defaultOptions ''NjeLogin)
 
 loadJSONFromFile :: Aeson.FromJSON a => FilePath -> IO a
 loadJSONFromFile filename = do
