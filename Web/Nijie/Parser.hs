@@ -38,8 +38,16 @@ import Control.Applicative ((<$>))
 
 test = do
   doc <- HTML.readFile "out.html"
-  print $ njeTagsFromDoc doc
+  putStrLn $ njeDescriptionFromDoc doc
   -- Monad.forM_ s $ print . njeId
+
+-- njeDescriptionFromDoc :: XML.Document -> ByteString
+njeDescriptionFromDoc doc =
+  let [s] = XMLC.fromDocument doc
+            $// XMLC.attributeIs "id" "view-honbun"
+            &// XMLC.attributeIs "itemprop" "description"
+      descs = XMLC.child s >>= XMLC.content
+  in Text.unpack $ Text.concat descs
 
 njeTagsFromDoc :: XML.Document -> [ByteString]
 njeTagsFromDoc doc =
