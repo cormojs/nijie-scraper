@@ -13,7 +13,6 @@ import qualified Network.HTTP.Client  as Client
 -- Date
 import qualified Data.Time.Clock    as Clock
 import qualified Data.Time.Calendar as Calendar
-import qualified Data.UnixTime      as UnixTime
 
 -- Control
 import qualified Control.Monad.Trans as Trans

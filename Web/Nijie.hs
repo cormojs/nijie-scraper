@@ -43,7 +43,6 @@ import Text.Blaze.Html.Renderer.Text (renderHtml)
 -- Date
 import qualified Data.Time.Clock    as Clock
 import qualified Data.Time.Calendar as Calendar
-import qualified Data.UnixTime      as UnixTime
 
 -- Control
 import qualified Control.Monad as Monad
@@ -82,16 +81,8 @@ import Text.Regex.Posix ((=~))
 ---
 -- test
 test' = do
-  cookie  <- sessionCookie
-  let (api, query) = njeApiToQuery (NjeRank NjeRankNow)
-  request <- HTTP.parseUrl $ njeEndpoint api
-  let request' = request { HTTP.cookieJar = Just cookie
-                         , HTTP.queryString =
-                           Types.renderSimpleQuery True query
-                         }
-  manager <- HTTP.newManager HTTP.conduitManagerSettings
-  response <- HTTP.httpLbs request' manager
-  Char8Lazy.writeFile "out.html" $ HTTP.responseBody response
+  doc <- njeDoc $ NjeView "96144"
+  renderFile "out.html" doc
 
 
 test'' :: IO ()
@@ -120,7 +111,6 @@ postForm id njeApi = do
   let (api, query) = njeApiToQuery njeApi
   request <- HTTP.parseUrl $ njeEndpoint api
   cookie  <- sessionCookie
-  print $ Types.renderSimpleQuery False query
   putStrLn $ njeEndpoint api
   let request' = request { HTTP.cookieJar = Just cookie
                          , HTTP.requestBody =
