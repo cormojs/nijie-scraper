@@ -127,6 +127,7 @@ postForm id njeApi = do
                          }
   manager <- HTTP.newManager HTTP.conduitManagerSettings
   response <- HTTP.httpLbs request' manager
+  return ()
   where toUrl (url, q) = Char8.append
                          (Char8.pack $ njeEndpoint url)
                          (Types.renderSimpleQuery True q)
