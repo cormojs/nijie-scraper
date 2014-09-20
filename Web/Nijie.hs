@@ -10,6 +10,7 @@ module Web.Nijie
        , njeNuitaAdd
        , njeRightAuthor
        , njeTagsFromDoc
+       , njeDescriptionFromDoc
        ) where
 
 
@@ -111,7 +112,6 @@ postForm id njeApi = do
   let (api, query) = njeApiToQuery njeApi
   request <- HTTP.parseUrl $ njeEndpoint api
   cookie  <- sessionCookie
-  putStrLn $ njeEndpoint api
   let request' = request { HTTP.cookieJar = Just cookie
                          , HTTP.requestBody =
                            HTTP.RequestBodyBS
@@ -127,7 +127,6 @@ postForm id njeApi = do
                          }
   manager <- HTTP.newManager HTTP.conduitManagerSettings
   response <- HTTP.httpLbs request' manager
-  Char8Lazy.putStrLn $ HTTP.responseBody response
   where toUrl (url, q) = Char8.append
                          (Char8.pack $ njeEndpoint url)
                          (Types.renderSimpleQuery True q)
