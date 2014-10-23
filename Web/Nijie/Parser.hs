@@ -174,15 +174,13 @@ njeOkazuCursorToNjeLink :: XMLC.Cursor -> NjeLink
 njeOkazuCursorToNjeLink link =
   let id = head $ XMLC.attribute "href" link
       [titleC] = link $// XMLC.attributeIs "class" "rank"
-                      &// XMLC.attributeIs "class" "set-rank-right"
-                      &// XMLC.attributeIs "class" "rank-left2"
+                      &// XMLC.attributeIs "class" "title"
       [thumbs] = link $// XMLC.attributeIs "class" "rank"
-                      &// XMLC.attributeIs "class" "set-rank-left"
-                      &// XMLC.attributeIs "class" "thumbnail-block"
-                      &// XMLC.attributeIs "class" "rank-left"
-                      &// XMLC.attributeIs "itemprop" "image"
+                      &// XMLC.attributeIs "class" "illust_block"
+                      &// XMLC.attributeIs "class" "illust"
+                      &// XMLC.element "img"
       [title]  = XMLC.content =<< XMLC.child =<< titleC $// XMLC.element "strong"
-      [author] = XMLC.content =<< XMLC.child titleC
+      [author] = XMLC.content =<< XMLC.child =<< titleC $// XMLC.element "span"
       kind = link
              $// XMLC.attributeIs "class" "okazu-thumbnail-icon"
              &// XMLC.element "img"
