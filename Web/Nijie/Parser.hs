@@ -45,7 +45,7 @@ test = do
 njeDescriptionFromDoc doc =
   let [s] = XMLC.fromDocument doc
             $// XMLC.attributeIs "id" "view-honbun"
-            &// XMLC.attributeIs "itemprop" "description"
+            &// XMLC.attributeIs "class" "m-bottom15"
       descs = XMLC.child s >>= XMLC.content
   in Text.unpack $ Text.concat descs
 
@@ -64,11 +64,9 @@ njeLinksFromThumbs :: NjeAPI -> XML.Document -> [NjeLink]
 njeLinksFromThumbs api doc = go api
   where go (NjeLike _) = map njeLikeCursorToNjeLink $ cursor
                          $// XMLC.attributeIs "id" "main-left-main"
-                         &// XMLC.attributeIs "class" "nijie"
+                         &// XMLC.attributeIs "class" "nijie mozamoza illust_list"
         go (NjeFav _)  = map njeBookmarkCursorToNjeLink $ cursor
-                         $// XMLC.attributeIs "id"    "main"
-                         &// XMLC.attributeIs "class" "main-left2"
-                         &// XMLC.attributeIs "class" "nijie-bookmark nijie"
+                         $// XMLC.attributeIs "class" "nijie-bookmark"
         go (NjeRank _) = map njeOkazuCursorToNjeLink $ cursor
                          $// XMLC.attributeIs "id" "okazu_list"
                          &// XMLC.element "a"
@@ -84,10 +82,11 @@ njeLinksFromThumbs api doc = go api
                                  &// XMLC.attributeIs "class" "nijie"
         go (NjeSearch _ _ _) = map njeLikeCursorToNjeLink $ cursor
                                $// XMLC.attributeIs "id" "main-left-main"
-                               &// XMLC.attributeIs "class" "nijie"
+                               &// XMLC.attributeIs "class" "nijie mozamoza illust_list"
         cursor = XMLC.fromDocument doc
 
 
+toUserId :: Text -> ByteString
 toUserId text   = TextEnc.encodeUtf8 text =~ pattern
   where pattern = "([0-9]+)" :: ByteString
 
@@ -128,7 +127,7 @@ njeLikeCursorToNjeLink cursor =
       kImg    = cursor $// XMLC.attributeIs "class" "thumbnail-icon"
                        &// XMLC.element "img"
       anime   = cursor $// XMLC.attributeIs "class" "thumbnail-anime-icon"
-      [auSpn] = cursor $// XMLC.attributeIs "itemprop" "author"
+      [auSpn] = cursor $// XMLC.element "span"
       [auIdA] = XMLC.parent auSpn
       [link]  = dao $// XMLC.element "a"
       [thImg] = dao $// XMLC.element "img"
@@ -148,9 +147,9 @@ njeBookmarkCursorToNjeLink :: XMLC.Cursor -> NjeLink
 njeBookmarkCursorToNjeLink cursor =
   let [dao]   = cursor $// XMLC.attributeIs "class" "picture"
                        &// XMLC.attributeIs "class" "nijiedao"
-      kImg    = cursor $// XMLC.attributeIs "class" "thumbnail-icon"
+      kImg    = cursor $// XMLC.attributeIs "class" "bookmark-thumbnail-icon"
                        &// XMLC.element "img"
-      kAnime  = cursor $// XMLC.attributeIs "class" "thumbnail-anime-icon"
+      kAnime  = cursor $// XMLC.attributeIs "class" "bookmark-thumbnail-anime-icon"
       [authP] = cursor $// XMLC.attributeIs "class" "kazu"
       [authA] = authP  $// XMLC.element "a"
       [tleP]  = cursor $// XMLC.attributeIs "class" "title"
