@@ -24,7 +24,7 @@ library
   -- other-modules:       
   default-extensions:    OverloadedStrings
   other-extensions:    OverloadedStrings
-  build-depends:       base >=4.6 && <4.8, mtl, time, HTTP, text, bytestring, resourcet, conduit
+  build-depends:       base >=4.6 && <4.9, mtl, time, HTTP, text, bytestring, resourcet, conduit
                      , conduit-extra, http-conduit, html-conduit, xml-conduit, xml-types, blaze-html
                      , http-types, http-client, aeson, aeson-pretty, utf8-string, regex-posix
                      , filepath, directory
