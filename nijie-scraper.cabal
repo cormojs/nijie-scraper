@@ -1,0 +1,66 @@
+name:                nijie-scraper
+version:             0.2.2.2
+synopsis:            Initial project template from stack
+description:         Please see README.md
+homepage:            http://github.com/githubuser/nijie-scraper#readme
+license:             BSD3
+license-file:        LICENSE
+author:              cormojs
+maintainer:          cormorant2+github@gmail.com
+copyright:           2016 cormojs
+category:            Web
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Web.Nijie
+                     , Web.Nijie.JSON
+                     , Web.Nijie.Login
+                     , Web.Nijie.Parser
+                     , Web.Nijie.Types
+  build-depends:       base >= 4.7 && < 5
+                     , mtl
+                     , time
+                     , HTTP
+                     , text
+                     , bytestring
+                     , resourcet
+                     , conduit
+                     , conduit-extra
+                     , http-conduit
+                     , html-conduit
+                     , xml-conduit
+                     , xml-types
+                     , blaze-html
+                     , http-types
+                     , http-client
+                     , aeson
+                     , aeson-pretty
+                     , utf8-string
+                     , regex-posix
+                     , filepath
+                     , directory
+  default-language:    Haskell2010
+
+executable nijie-scraper-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , nijie-scraper
+  default-language:    Haskell2010
+
+test-suite nijie-scraper-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , nijie-scraper
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/githubuser/nijie-scraper
