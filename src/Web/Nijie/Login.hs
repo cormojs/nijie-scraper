@@ -1,3 +1,4 @@
+
 {-# LANGUAGE OverloadedStrings #-}
 module Web.Nijie.Login where
 
@@ -43,7 +44,7 @@ njeLogin email password = do
                , ("ticket", "") ]
   cookie <- fetchCookie
   time     <- Clock.getCurrentTime
-  manager  <- HTTP.newManager HTTP.conduitManagerSettings
+  manager  <- HTTP.newManager HTTP.tlsManagerSettings
   request  <- HTTP.parseUrl $ njeEndpoint login
   response <- HTTP.httpLbs (request { HTTP.cookieJar = Just cookie
                                     , HTTP.requestHeaders =
@@ -61,7 +62,7 @@ njeLogin email password = do
     login = "login_int"
     fetchCookie = do
       request  <- HTTP.parseUrl $ njeEndpoint "login"
-      manager  <- HTTP.newManager HTTP.conduitManagerSettings
+      manager  <- HTTP.newManager HTTP.tlsManagerSettings
       response <- HTTP.httpLbs request manager
       time     <- Clock.getCurrentTime
       return $ fst

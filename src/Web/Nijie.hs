@@ -1,4 +1,3 @@
-
 {-# LANGUAGE OverloadedStrings #-}
 module Web.Nijie
        ( getRawStream
@@ -12,6 +11,7 @@ module Web.Nijie
        , getRightAuthor
        , getTags
        , getDescription
+       , getNextPage
        ) where
 
 
@@ -23,8 +23,8 @@ import Web.Nijie.Types
 import Web.Nijie.Parser
 
 -- conduit
-import Data.Conduit as C
-import qualified Data.Conduit.Binary as CB
+import Data.Conduit as Conduit
+import qualified Data.Conduit.Binary as ConduitBinary
 import Control.Monad.Trans.Resource (ResourceT(), MonadResource)
 import qualified Control.Monad.Trans.Resource as Resource
 
@@ -82,12 +82,12 @@ import Text.Regex.Posix ((=~))
 
 ---
 -- add an illust to your bookmarks
-postBookmarkAdd (NjeLink { njeId = id }) = postForm id $ NjeFavAdd  id
-postNuitaAdd    (NjeLink { njeId = id }) = postForm id $ NjeNuiAdd  id
-postGoodAdd     (NjeLink { njeId = id }) = postForm id $ NjeGoodAdd id
+postBookmarkAdd (Link { illustId = id }) = postForm id $ FavAdd  id
+postNuitaAdd    (Link { illustId = id }) = postForm id $ NuiAdd  id
+postGoodAdd     (Link { illustId = id }) = postForm id $ GoodAdd id
 
 postForm id njeApi = do
-  let (api, query) = njeApiToQuery njeApi
+  let (api, query) = convertAPIToQuery njeApi
   request <- HTTP.parseUrl $ njeEndpoint api
   cookie  <- sessionCookie
   let request' = request { HTTP.cookieJar = Just cookie
@@ -101,7 +101,7 @@ postForm id njeApi = do
                            , ("X-Requested-With", "XMLHttpRequest")
                            , (Types.hConnection, "keep-alive")
                            , (Types.hReferer,
-                              toUrl $ njeApiToQuery (NjeView id))]
+                              toUrl $ convertAPIToQuery (View id))]
                          }
   manager <- HTTP.newManager HTTP.tlsManagerSettings
   response <- HTTP.httpLbs request' manager
@@ -115,15 +115,15 @@ postForm id njeApi = do
 ---
 -- Save illust
 
-saveTopIllust :: FilePath -> NjeLink -> IO FilePath
-saveTopIllust saveDir link@(NjeLink { njeId = id }) = do
+saveTopIllust :: FilePath -> Link -> IO FilePath
+saveTopIllust saveDir link@(Link { illustId = id }) = do
   (imageUrl:_) <- getIllustUrls link
   saveUrl (saveDir </> Char8.unpack id) imageUrl
 
 
-getRightAuthor :: NjeLink -> IO NjeUser
-getRightAuthor (NjeLink { njeId = id }) = do
-  cursor <- XMLC.fromDocument <$> getDocument (NjeView id)
+getRightAuthor :: Link -> IO User
+getRightAuthor (Link { illustId = id }) = do
+  cursor <- XMLC.fromDocument <$> getDocument (View id)
   let [authE] = cursor
                $// XMLC.attributeIs "class" "user_icon"
                &// XMLC.element "a"
@@ -132,17 +132,20 @@ getRightAuthor (NjeLink { njeId = id }) = do
                &// XMLC.element "img"
   let userId = toAuthorId $ head $ XMLC.attribute "href" authE
       name = TextEnc.encodeUtf8 $ head $ XMLC.attribute "alt" nameE
-  return $ NjeUser name userId
+  return $ User name userId
 
-getIllustUrls :: NjeLink -> IO [String]
-getIllustUrls (NjeLink { njeId = id, njeKind = kind }) = do
-  cursor <- XMLC.fromDocument <$> getDocument (NjeView id)
-  let links = getLinks kind cursor
+getIllustUrls :: Link -> IO [String]
+getIllustUrls (Link { illustId = id, kind = Doujin }) = do
+  cursor <- XMLC.fromDocument <$> getDocument (View id)
+  let links = cursor $// XMLC.attributeIs "class" "dojin_gallery"
       urls  = map (XMLC.attribute "href") links
   return $ map (("http:"++) . Text.unpack . head) urls
-  where getLinks NjeDoujin c = c $// XMLC.attributeIs "class" "dojin_gallery"
-        getLinks _ c         = c $// XMLC.attributeIs "id" "gallery_open"
-                                 &// XMLC.element "a"
+getIllustUrls (Link { illustId = id }) = do
+  cursor <- XMLC.fromDocument <$> getDocument (ViewPopup id)
+  let imgs = cursor $// XMLC.attributeIs "id" "img_window"
+                    &// XMLC.attributeIs "class" "box-shadow999"
+      urls  = map (XMLC.attribute "src") imgs
+  return $ map (("http:"++) . Text.unpack . head) urls
 
 saveUrl :: FilePath -> String -> IO FilePath
 saveUrl filename url = Resource.runResourceT $ do
@@ -153,7 +156,7 @@ saveUrl filename url = Resource.runResourceT $ do
   Monad.unless exists $ do
     (request, manager) <- reqman
     body <- HTTP.responseBody <$> HTTP.http request manager
-    body $$+- CB.sinkFile filename'
+    body $$+- ConduitBinary.sinkFile filename'
   return filename'
     where
       reqman = Trans.liftIO $ do
@@ -169,7 +172,7 @@ saveUrl filename url = Resource.runResourceT $ do
 
 getRawStream :: MonadResource m =>
              String -> Types.SimpleQuery ->
-             m (C.ResumableSource m ByteString)
+             m (Conduit.ResumableSource m ByteString)
 getRawStream api query = do
   cookie <- Trans.liftIO sessionCookie
   request <- Trans.liftIO $ HTTP.parseUrl $ njeEndpoint api
@@ -188,23 +191,23 @@ getRawStream api query = do
 
 getEventStream :: MonadResource m =>
                   String -> Types.SimpleQuery ->
-                  m (C.ResumableSource m XMLTypes.Event)
+                  m (Conduit.ResumableSource m XMLTypes.Event)
 getEventStream api query = do
   body <- getRawStream api query
   return $ body $=+ HTML.eventConduit
 
-getDocument :: NjeAPI -> IO XML.Document
+getDocument :: API -> IO XML.Document
 getDocument njeApi = Resource.runResourceT $ do
-  let (api, query) = njeApiToQuery njeApi
+  let (api, query) = convertAPIToQuery njeApi
   body <- getRawStream api query
   body $$+- HTML.sinkDoc
 
+
 fetchFavsDoc :: Int -> IO XML.Document
-fetchFavsDoc p = getDocument (NjeLike p)
+fetchFavsDoc p = getDocument (Like p)
 
 render :: [XMLC.Cursor] -> TextL.Text
 render cs = TextL.concat $ map (renderHtml . BlazeHtml.toHtml . XMLC.node) cs
 
 renderFile filename doc =
   TextLIO.writeFile filename $ renderHtml $ BlazeHtml.toHtml doc
-

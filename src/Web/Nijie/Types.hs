@@ -1,13 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Web.Nijie.Types
-       ( NjeUser(..)
-       , NjeKind(..)
-       , NjeLink(..)
-       , NjeAPI (..)
-       , NjeRankType(..)
-       , NjeSort(..)
-       , NjeLogin(..)
-       , njeApiToQuery
+       ( User(..)
+       , Kind(..)
+       , Link(..)
+       , API (..)
+       , RankType(..)
+       , Sort(..)
+       , Login(..)
+       , convertAPIToQuery
        ) where
 
 
@@ -19,75 +19,81 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as Char8
 
 
-data NjeUser = NjeUser { njeUserName :: ByteString
-                       , njeUserId   :: ByteString }
+data User = User { userName :: ByteString
+                 , userId   :: ByteString }
              deriving (Eq, Show)
 
-data NjeKind = NjeDoujin | NjeManga | NjeSingle
+data Kind = Doujin | Manga | Single
              deriving (Eq, Show)
 
-data NjeLink = NjeLink { njeId        :: ByteString
-                       , njeThumbUrl  :: String
-                       , njeTitle     :: ByteString
-                       , njeAuthor    :: NjeUser
-                       , njeKind      :: NjeKind
-                       , njeIsAnime   :: Bool
-                       } deriving (Eq, Show)
+data Link = Link { illustId    :: ByteString
+                 , thumbUrl    :: String
+                 , illustTitle :: ByteString
+                 , author       :: User
+                 , kind        :: Kind
+                 , isAnime     :: Bool
+                 } deriving (Eq, Show)
 
 type Page = Int
 
-data NjeLogin = NjeLogin { njeEmail    :: ByteString
-                         , njePassword :: ByteString }
+data Login = Login { email    :: ByteString
+                   , password :: ByteString }
 
-data NjeAPI = NjeLike Page
-            | NjeFav Page
-            | NjeRank NjeRankType
-            | NjeView ByteString
-            | NjeFavAdd ByteString
-            | NjeNuiAdd ByteString
-            | NjeGoodAdd ByteString
-            | NjeUserIllust NjeUser
-            | NjeUserBookmark NjeUser
-            | NjeUserNuita NjeUser
-            | NjeSearch ByteString NjeSort Page
-            deriving (Eq, Show)
+data API =
+    Like Page
+  | Fav Page
+  | Rank RankType
+  | View ByteString
+  | ViewPopup ByteString
+  | FavAdd ByteString
+  | NuiAdd ByteString
+  | GoodAdd ByteString
+  | UserIllust User
+  | UserBookmark User
+  | UserNuita User
+  | Search ByteString Sort Page
+  deriving (Eq, Show)
 
-data NjeSort = NjeSortDateA | NjeSortDateD
-             | NjeSortNui | NjeSortGood
-             deriving Eq
-instance Show NjeSort where
-  show NjeSortDateA = "0"
-  show NjeSortDateD = "3"
-  show NjeSortNui   = "2"
-  show NjeSortGood  = "1"
+data Sort =
+    SortDateA
+  | SortDateD
+  | SortNui
+  | SortGood
+  deriving Eq
+instance Show Sort where
+  show SortDateA = "0"
+  show SortDateD = "3"
+  show SortNui   = "2"
+  show SortGood  = "1"
 
 
-data NjeRankType = NjeRankNow | NjeRankDay | NjeRankWeek | NjeRankMonth
+data RankType = RankNow | RankDay | RankWeek | RankMonth
                  deriving Eq
 
-instance Show NjeRankType where
-  show NjeRankNow   = "now"
-  show NjeRankDay   = "day"
-  show NjeRankWeek  = "week"
-  show NjeRankMonth = "month"
+instance Show RankType where
+  show RankNow   = "now"
+  show RankDay   = "day"
+  show RankWeek  = "week"
+  show RankMonth = "month"
 
-njeApiToQuery :: NjeAPI -> (String, Types.SimpleQuery)
-njeApiToQuery api = case api of
-  (NjeLike p)    -> ("like_user_view", [("p", ps p)])
-  (NjeFav p)     -> ("okiniiri",       [("p", ps p)])
-  (NjeRank typ)  -> ("okazu",          [("type", ps typ)])
-  (NjeView id)   -> ("view",           [("id", id)])
-  (NjeFavAdd id) -> ("bookmark_add",   [("tag", ""),
+convertAPIToQuery :: API -> (String, Types.SimpleQuery)
+convertAPIToQuery api = case api of
+  (Like p)    -> ("like_user_view", [("p", ps p)])
+  (Fav p)     -> ("okiniiri",       [("p", ps p)])
+  (Rank typ)  -> ("okazu",          [("type", ps typ)])
+  (View id)   -> ("view",           [("id", id)])
+  (ViewPopup id)   -> ("view_popup",           [("id", id)])
+  (FavAdd id) -> ("bookmark_add",   [("tag", ""),
                                         ("id", id)])
-  (NjeNuiAdd id) -> ("php/ajax/add_nuita", [("id", id)])
-  (NjeGoodAdd id) -> ("php/ajax/add_good", [("id", id)])
-  (NjeUserIllust   user) ->
-    ("members_illust",        [("id", njeUserId user)])
-  (NjeUserBookmark user) ->
-    ("user_like_illust_view", [("id", njeUserId user)])
-  (NjeUserNuita    user) ->
-    ("history_nuita",         [("id", njeUserId user)])
-  (NjeSearch word sort page) ->
+  (NuiAdd id) -> ("php/ajax/add_nuita", [("id", id)])
+  (GoodAdd id) -> ("php/ajax/add_good", [("id", id)])
+  (UserIllust   user) ->
+    ("members_illust",        [("id", userId user)])
+  (UserBookmark user) ->
+    ("user_like_illust_view", [("id", userId user)])
+  (UserNuita    user) ->
+    ("history_nuita",         [("id", userId user)])
+  (Search word sort page) ->
     ("search", [("word", word), ("p", ps page),
                 ("sort", ps sort)])
   where ps :: Show a => a -> ByteString
