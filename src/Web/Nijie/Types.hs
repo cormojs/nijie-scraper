@@ -23,15 +23,15 @@ data User = User { userName :: ByteString
                  , userId   :: ByteString }
              deriving (Eq, Show)
 
-data Kind = Doujin | Manga | Single
-             deriving (Eq, Show)
+data Kind =
+  Doujin | Manga | Single | Anime
+  deriving (Eq, Show)
 
 data Link = Link { illustId    :: ByteString
                  , thumbUrl    :: String
                  , illustTitle :: ByteString
-                 , author       :: User
+                 , author      :: User
                  , kind        :: Kind
-                 , isAnime     :: Bool
                  } deriving (Eq, Show)
 
 type Page = Int
@@ -49,8 +49,7 @@ data API =
   | NuiAdd ByteString
   | GoodAdd ByteString
   | UserIllust User
-  | UserBookmark User
-  | UserNuita User
+  | UserBookmark User Page
   | Search ByteString Sort Page
   deriving (Eq, Show)
 
@@ -78,23 +77,21 @@ instance Show RankType where
 
 convertAPIToQuery :: API -> (String, Types.SimpleQuery)
 convertAPIToQuery api = case api of
-  (Like p)    -> ("like_user_view", [("p", ps p)])
-  (Fav p)     -> ("okiniiri",       [("p", ps p)])
-  (Rank typ)  -> ("okazu",          [("type", ps typ)])
-  (View id)   -> ("view",           [("id", id)])
-  (ViewPopup id)   -> ("view_popup",           [("id", id)])
-  (FavAdd id) -> ("bookmark_add",   [("tag", ""),
-                                        ("id", id)])
-  (NuiAdd id) -> ("php/ajax/add_nuita", [("id", id)])
-  (GoodAdd id) -> ("php/ajax/add_good", [("id", id)])
-  (UserIllust   user) ->
-    ("members_illust",        [("id", userId user)])
-  (UserBookmark user) ->
-    ("user_like_illust_view", [("id", userId user)])
-  (UserNuita    user) ->
-    ("history_nuita",         [("id", userId user)])
-  (Search word sort page) ->
-    ("search", [("word", word), ("p", ps page),
-                ("sort", ps sort)])
+  Like p    -> ("like_user_view", [ ("p", ps p) ])
+  Fav p     -> ("okiniiri",       [ ("p", ps p) ])
+  Rank typ  -> ("okazu",          [ ("type", ps typ) ])
+  View id   -> ("view",           [ ("id", id) ])
+  ViewPopup id -> ("view_popup",  [ ("id", id) ])
+  FavAdd id -> ("bookmark_add",   [ ("tag", "")
+                                  , ("id", id) ])
+  NuiAdd id -> ("php/ajax/add_nuita", [("id", id) ])
+  GoodAdd id -> ("php/ajax/add_good", [("id", id) ])
+  UserIllust user -> ("members_illust", [("id", userId user) ])
+  UserBookmark user p ->
+    ("user_like_illust_view", [ ("id", userId user)
+                              , ("p", ps p) ])
+  Search word sort page -> ("search", [ ("word", word)
+                                      , ("p", ps page)
+                                      , ("sort", ps sort) ])
   where ps :: Show a => a -> ByteString
         ps = Char8.pack . show

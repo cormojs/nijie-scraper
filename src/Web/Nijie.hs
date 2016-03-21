@@ -12,6 +12,7 @@ module Web.Nijie
        , getTags
        , getDescription
        , getNextPage
+       , getSize
        ) where
 
 
