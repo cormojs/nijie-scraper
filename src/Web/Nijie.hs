@@ -13,6 +13,7 @@ module Web.Nijie
        , getDescription
        , getNextPage
        , getSize
+       , toggleSortAPI
        ) where
 
 
@@ -80,6 +81,13 @@ import qualified System.FilePath  as FilePath
 -- regex-posix
 import Text.Regex.Posix ((=~))
 
+---
+-- api auxiliary functions
+
+toggleSortAPI :: ListAPI -> ListAPI
+toggleSortAPI (Search tag sort page) = Search tag (toggleSort sort) page
+toggleSortAPI (Fav sort page) = Fav (toggleSort sort) page
+toggleSortAPI api = api
 
 ---
 -- add an illust to your bookmarks
@@ -87,9 +95,10 @@ postBookmarkAdd (Link { illustId = id }) = postForm id $ FavAdd  id
 postNuitaAdd    (Link { illustId = id }) = postForm id $ NuiAdd  id
 postGoodAdd     (Link { illustId = id }) = postForm id $ GoodAdd id
 
+postForm :: ByteString -> PostAPI -> IO ()
 postForm id njeApi = do
   let (api, query) = convertAPIToQuery njeApi
-  request <- HTTP.parseUrl $ njeEndpoint api
+  request <- HTTP.parseUrl $ endpoint api
   cookie  <- sessionCookie
   let request' = request { HTTP.cookieJar = Just cookie
                          , HTTP.requestBody =
@@ -108,7 +117,7 @@ postForm id njeApi = do
   response <- HTTP.httpLbs request' manager
   return ()
   where toUrl (url, q) = Char8.append
-                         (Char8.pack $ njeEndpoint url)
+                         (Char8.pack $ endpoint url)
                          (Types.renderSimpleQuery True q)
 
 
@@ -176,7 +185,7 @@ getRawStream :: MonadResource m =>
              m (Conduit.ResumableSource m ByteString)
 getRawStream api query = do
   cookie <- Trans.liftIO sessionCookie
-  request <- Trans.liftIO $ HTTP.parseUrl $ njeEndpoint api
+  request <- Trans.liftIO $ HTTP.parseUrl $ endpoint api
   let request' = request { HTTP.cookieJar = Just cookie
                          , HTTP.queryString = Types.renderSimpleQuery True query }
   manager  <- Trans.liftIO $ HTTP.newManager HTTP.tlsManagerSettings
@@ -197,7 +206,7 @@ getEventStream api query = do
   body <- getRawStream api query
   return $ body $=+ HTML.eventConduit
 
-getDocument :: API -> IO XML.Document
+getDocument :: API api => api -> IO XML.Document
 getDocument njeApi = Resource.runResourceT $ do
   let (api, query) = convertAPIToQuery njeApi
   body <- getRawStream api query

@@ -1,4 +1,3 @@
-
 {-# LANGUAGE OverloadedStrings #-}
 module Web.Nijie.Login where
 
@@ -30,14 +29,14 @@ import qualified Data.Text.Lazy.IO     as TextIO
 
 
 
-njeEndpoint :: String -> String
-njeEndpoint s = "http://nijie.info/" ++ s ++ ".php"
+endpoint :: String -> String
+endpoint s = "http://nijie.info/" ++ s ++ ".php"
 
 
 
-njeLogin :: ByteString -> ByteString ->
+login :: ByteString -> ByteString ->
             IO (HTTP.CookieJar, HTTP.Response BSLazy.ByteString)
-njeLogin email password = do
+login email password = do
   let query  = [ ("email", email)
                , ("password", password)
                , ("save", "on")
@@ -45,7 +44,7 @@ njeLogin email password = do
   cookie <- fetchCookie
   time     <- Clock.getCurrentTime
   manager  <- HTTP.newManager HTTP.tlsManagerSettings
-  request  <- HTTP.parseUrl $ njeEndpoint login
+  request  <- HTTP.parseUrl $ endpoint login
   response <- HTTP.httpLbs (request { HTTP.cookieJar = Just cookie
                                     , HTTP.requestHeaders =
                                       [ (Types.hContentType,
@@ -53,7 +52,7 @@ njeLogin email password = do
                                       ]
                                     , HTTP.requestBody =
                                         HTTP.RequestBodyBS
-                                        $ Types.renderSimpleQuery False query 
+                                        $ Types.renderSimpleQuery False query
                                     , HTTP.method = Types.methodPost })
 
                manager
@@ -61,7 +60,7 @@ njeLogin email password = do
   where
     login = "login_int"
     fetchCookie = do
-      request  <- HTTP.parseUrl $ njeEndpoint "login"
+      request  <- HTTP.parseUrl $ endpoint "login"
       manager  <- HTTP.newManager HTTP.tlsManagerSettings
       response <- HTTP.httpLbs request manager
       time     <- Clock.getCurrentTime
@@ -69,9 +68,9 @@ njeLogin email password = do
        $ Client.updateCookieJar response request time (HTTP.createCookieJar [])
 
 
-njeLoginSave :: FilePath -> ByteString -> ByteString -> IO ()
-njeLoginSave filename email password = do
-  (cookie, response) <- njeLogin email password
+loginSave :: FilePath -> ByteString -> ByteString -> IO ()
+loginSave filename email password = do
+  (cookie, response) <- login email password
   saveJSONToFile filename cookie
 
 sessionCookie :: IO HTTP.CookieJar

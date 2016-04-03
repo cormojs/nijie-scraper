@@ -12,6 +12,9 @@ import qualified Text.XML.Cursor as XMLC
 import qualified Text.Blaze.Html as BlazeHtml (toHtml)
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
+-- exception
+import qualified Control.Exception as Exception
+
 -- regex-posix
 import Text.Regex.Posix ((=~))
 
@@ -59,13 +62,18 @@ getTags doc =
           let (e:_) = s $// XMLC.element "a"
           in head $ XMLC.child e >>= XMLC.content
 
-getLinks :: API -> XML.Document -> [Link]
-getLinks api doc = go api
-  where go (Like _) = map njeLikeCursorToNjeLink $ cursor
-                         $// XMLC.attributeIs "id" "main-left-main"
-                         &// XMLC.attributeIs "class" "nijie mozamoza illust_list"
-        go (Fav _)  = map njeBookmarkCursorToNjeLink $ cursor
-                         $// XMLC.attributeIs "class" "nijie-bookmark"
+getLinks :: ListAPI -> XML.Document -> [Link]
+getLinks api doc = case go api of
+  [] -> Exception.throw NotLoggedInException
+  lst -> lst
+  where go (Illust _) = map njeLikeCursorToNjeLink $ cursor
+                        $// XMLC.attributeIs "id" "main-left-main"
+                        &// XMLC.attributeIs "class" "nijie mozamoza illust_list"
+        go (Like _) = map njeLikeCursorToNjeLink $ cursor
+                      $// XMLC.attributeIs "id" "main-left-main"
+                      &// XMLC.attributeIs "class" "nijie mozamoza illust_list"
+        go (Fav _ _)  = map njeBookmarkCursorToNjeLink $ cursor
+                        $// XMLC.attributeIs "class" "nijie-bookmark"
         go (Rank _) = map njeOkazuCursorToNjeLink $ cursor
                          $// XMLC.attributeIs "id" "okazu_list"
                          &// XMLC.element "a"
@@ -81,7 +89,7 @@ getLinks api doc = go api
                                &// XMLC.attributeIs "class" "nijie mozamoza illust_list"
         cursor = XMLC.fromDocument doc
 
-getSize :: API -> XML.Document -> Int
+getSize :: ListAPI -> XML.Document -> Int
 getSize api doc = go api
   where
     cursor = XMLC.fromDocument doc
@@ -101,7 +109,12 @@ getSize api doc = go api
             $// XMLC.attributeIs "id" "main-left-main"
             &// XMLC.element "em" in
       extract $ convert em
-    go (Fav _) =
+    go (Illust _) =
+      let [em] = cursor
+            $// XMLC.attributeIs "id" "main-left-main"
+            &// XMLC.element "em" in
+      extract $ convert em
+    go (Fav _ _) =
       let [span] = cursor
             $// XMLC.attributeIs "id" "main-left-none"
             &// XMLC.element "span" in
@@ -113,12 +126,15 @@ getSize api doc = go api
       extract $ convert em
     go api = length $ getLinks api doc
 
-getNextPage :: API -> XML.Document -> Maybe API
+getNextPage :: ListAPI -> XML.Document -> Maybe ListAPI
+getNextPage api@(Illust page) doc
+  | hasNextPage api doc = Just $ Illust $ page+1
+  | otherwise = Nothing
 getNextPage api@(Like page) doc
   | hasNextPage api doc = Just $ Like $ page+1
   | otherwise = Nothing
-getNextPage api@(Fav  page) doc
-  | hasNextPage api doc = Just $ Fav $ page+1
+getNextPage api@(Fav s page) doc
+  | hasNextPage api doc = Just $ Fav s $ page+1
   | otherwise = Nothing
 getNextPage api@(Search str sort page) doc
   | hasNextPage api doc = Just $ Search str sort $ page+1
@@ -128,13 +144,14 @@ getNextPage api@(UserBookmark user page) doc
   | otherwise = Nothing
 getNextPage _ _ = Nothing
 
-hasNextPage :: API -> XML.Document -> Bool
+hasNextPage :: ListAPI -> XML.Document -> Bool
 hasNextPage api doc = go api
   where
     cursor = XMLC.fromDocument doc
     hasRelNext = not $ null $ cursor $// XMLC.attributeIs "rel" "next"
+    go (Illust _)      = hasRelNext
     go (Like _)        = hasRelNext
-    go (Fav _)         = hasRelNext
+    go (Fav _ _)         = hasRelNext
     go (Search _ _ _ ) = hasRelNext
     go (UserBookmark _ _) = hasRelNext
     go _ = False
@@ -149,8 +166,8 @@ toAuthorId text = TextEnc.encodeUtf8 text =~ pattern
 
 toThumbUrl = ("http:"++) . Text.unpack
 
-toNjeKind []     = Single
-toNjeKind [kImg] = case XMLC.attribute "alt" kImg of
+toKind []     = Single
+toKind [kImg] = case XMLC.attribute "alt" kImg of
   ["同人"] -> Doujin
   ["漫画"] -> Manga
   ["アニメ"] -> Anime
@@ -171,7 +188,7 @@ njeUserIllustCursorToNjeLink author cursor =
           , thumbUrl = toThumbUrl thUrl
           , illustTitle = TextEnc.encodeUtf8 title
           , author   = author
-          , kind     = toNjeKind kImg }
+          , kind     = toKind kImg }
 
 
 njeLikeCursorToNjeLink :: XMLC.Cursor -> Link
@@ -192,7 +209,7 @@ njeLikeCursorToNjeLink cursor =
           , thumbUrl = toThumbUrl thUrl
           , illustTitle    = TextEnc.encodeUtf8 title
           , author   = User (TextEnc.encodeUtf8 auN) (toAuthorId auId)
-          , kind     = toNjeKind kImg
+          , kind     = toKind kImg
           }
 
 njeBookmarkCursorToNjeLink :: XMLC.Cursor -> Link
@@ -208,17 +225,20 @@ njeBookmarkCursorToNjeLink cursor =
         [s] -> s
         (_:s:_) -> s
       [auId] = XMLC.attribute "href" authA
-      [auName]  = concatMap XMLC.content $ XMLC.child authA
+      auNames = concatMap XMLC.content $ XMLC.child authA
       [link]  = dao $// XMLC.element "a"
       [url]   = XMLC.attribute "href" link
       [thImg] = dao $// XMLC.element "img"
       [thUrl] = XMLC.attribute "src" thImg
-  in Link { illustId = toUserId url
-          , thumbUrl = toThumbUrl thUrl
-          , illustTitle    = TextEnc.encodeUtf8 $ head $ XMLC.content title
-          , author   = User (TextEnc.encodeUtf8 auName) (toAuthorId auId)
-          , kind     = toNjeKind kImg
-          }
+  in case auNames of
+    [auName] ->
+      Link { illustId = toUserId url
+           , thumbUrl = toThumbUrl thUrl
+           , illustTitle    = TextEnc.encodeUtf8 $ head $ XMLC.content title
+           , author   = User (TextEnc.encodeUtf8 auName) (toAuthorId auId)
+           , kind     = toKind kImg
+           }
+    _ -> Exception.throw ParseExcepiton
 
 njeOkazuCursorToNjeLink :: XMLC.Cursor -> Link
 njeOkazuCursorToNjeLink link =
@@ -239,5 +259,5 @@ njeOkazuCursorToNjeLink link =
           , illustTitle    = TextEnc.encodeUtf8 title
           , author   = User (TextEnc.encodeUtf8 $ Text.drop 4 author)
                                      "-1"
-          , kind     = toNjeKind kind
+          , kind     = toKind kind
           }
