@@ -9,6 +9,7 @@ module Web.Nijie.Types
        , ListAPI (..)
        , RankType(..)
        , Sort(..)
+       , SearchSort(..)
        , FavSort(..)
        , Login(..)
        , ParseExcepiton(..)
