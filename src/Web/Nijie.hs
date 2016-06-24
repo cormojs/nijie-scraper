@@ -1,18 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Web.Nijie
-       ( getRawStream
-       , getDocument
-       , getLinks
+       ( rawStream
+       , document
+       , links
        , saveUrl
        , saveTopIllust
-       , getIllustUrls
+       , illustUrls
        , postBookmarkAdd
        , postNuitaAdd
-       , getRightAuthor
-       , getTags
-       , getDescription
-       , getNextPage
-       , getSize
+       , rightAuthor
+       , tags
+       , description
+       , nextPage
+       , size
        , toggleSortAPI
        ) where
 
@@ -127,13 +127,13 @@ postForm id njeApi = do
 
 saveTopIllust :: FilePath -> Link -> IO FilePath
 saveTopIllust saveDir link@(Link { illustId = id }) = do
-  (imageUrl:_) <- getIllustUrls link
+  (imageUrl:_) <- illustUrls link
   saveUrl (saveDir </> Char8.unpack id) imageUrl
 
 
-getRightAuthor :: Link -> IO User
-getRightAuthor (Link { illustId = id }) = do
-  cursor <- XMLC.fromDocument <$> getDocument (View id)
+rightAuthor :: Link -> IO User
+rightAuthor (Link { illustId = id }) = do
+  cursor <- XMLC.fromDocument <$> document (View id)
   let [authE] = cursor
                $// XMLC.attributeIs "class" "user_icon"
                &// XMLC.element "a"
@@ -144,14 +144,14 @@ getRightAuthor (Link { illustId = id }) = do
       name = TextEnc.encodeUtf8 $ head $ XMLC.attribute "alt" nameE
   return $ User name userId
 
-getIllustUrls :: Link -> IO [String]
-getIllustUrls (Link { illustId = id, kind = Doujin }) = do
-  cursor <- XMLC.fromDocument <$> getDocument (View id)
+illustUrls :: Link -> IO [String]
+illustUrls (Link { illustId = id, kind = Doujin }) = do
+  cursor <- XMLC.fromDocument <$> document (View id)
   let links = cursor $// XMLC.attributeIs "class" "dojin_gallery"
       urls  = map (XMLC.attribute "href") links
   return $ map (("http:"++) . Text.unpack . head) urls
-getIllustUrls (Link { illustId = id }) = do
-  cursor <- XMLC.fromDocument <$> getDocument (ViewPopup id)
+illustUrls (Link { illustId = id }) = do
+  cursor <- XMLC.fromDocument <$> document (ViewPopup id)
   let imgs = cursor $// XMLC.attributeIs "id" "img_window"
                     &// XMLC.attributeIs "class" "box-shadow999"
       urls  = map (XMLC.attribute "src") imgs
@@ -180,10 +180,10 @@ saveUrl filename url = Resource.runResourceT $ do
 ---
 -- API access
 
-getRawStream :: MonadResource m =>
+rawStream :: MonadResource m =>
              String -> Types.SimpleQuery ->
              m (Conduit.ResumableSource m ByteString)
-getRawStream api query = do
+rawStream api query = do
   cookie <- Trans.liftIO sessionCookie
   request <- Trans.liftIO $ HTTP.parseUrl $ endpoint api
   let request' = request { HTTP.cookieJar = Just cookie
@@ -203,18 +203,18 @@ getEventStream :: MonadResource m =>
                   String -> Types.SimpleQuery ->
                   m (Conduit.ResumableSource m XMLTypes.Event)
 getEventStream api query = do
-  body <- getRawStream api query
+  body <- rawStream api query
   return $ body $=+ HTML.eventConduit
 
-getDocument :: API api => api -> IO XML.Document
-getDocument njeApi = Resource.runResourceT $ do
+document :: API api => api -> IO XML.Document
+document njeApi = Resource.runResourceT $ do
   let (api, query) = convertAPIToQuery njeApi
-  body <- getRawStream api query
+  body <- rawStream api query
   body $$+- HTML.sinkDoc
 
 
 fetchFavsDoc :: Int -> IO XML.Document
-fetchFavsDoc p = getDocument (Like p)
+fetchFavsDoc p = document (Like p)
 
 render :: [XMLC.Cursor] -> TextL.Text
 render cs = TextL.concat $ map (renderHtml . BlazeHtml.toHtml . XMLC.node) cs

@@ -43,16 +43,16 @@ import qualified Control.Monad.Trans as Trans
 import Control.Applicative ((<$>))
 
 
-getDescription :: XML.Document -> String
-getDescription doc =
+description :: XML.Document -> String
+description doc =
   let [s] = XMLC.fromDocument doc
             $// XMLC.attributeIs "id" "view-honbun"
             &// XMLC.attributeIs "class" "m-bottom15"
       descs = XMLC.child s >>= XMLC.content
   in Text.unpack $ Text.concat descs
 
-getTags :: XML.Document -> [ByteString]
-getTags doc =
+tags :: XML.Document -> [ByteString]
+tags doc =
   let s = XMLC.fromDocument doc
           $// XMLC.attributeIs "id" "view-tag"
           &// XMLC.attributeIs "class" "tag"
@@ -62,8 +62,8 @@ getTags doc =
           let (e:_) = s $// XMLC.element "a"
           in head $ XMLC.child e >>= XMLC.content
 
-getLinks :: ListAPI -> XML.Document -> [Link]
-getLinks api doc = case go api of
+links :: ListAPI -> XML.Document -> [Link]
+links api doc = case go api of
   [] -> Exception.throw NotLoggedInException
   lst -> lst
   where go (Illust _) = map njeLikeCursorToNjeLink $ cursor
@@ -89,8 +89,8 @@ getLinks api doc = case go api of
                                &// XMLC.attributeIs "class" "nijie mozamoza illust_list"
         cursor = XMLC.fromDocument doc
 
-getSize :: ListAPI -> XML.Document -> Int
-getSize api doc = go api
+size :: ListAPI -> XML.Document -> Int
+size api doc = go api
   where
     cursor = XMLC.fromDocument doc
     pattern = "([0-9,]+)" :: ByteString
@@ -124,25 +124,25 @@ getSize api doc = go api
             $// XMLC.attributeIs "class" "mem-indent float-left"
             &// XMLC.element "em" in
       extract $ convert em
-    go api = length $ getLinks api doc
+    go api = length $ links api doc
 
-getNextPage :: ListAPI -> XML.Document -> Maybe ListAPI
-getNextPage api@(Illust page) doc
+nextPage :: ListAPI -> XML.Document -> Maybe ListAPI
+nextPage api@(Illust page) doc
   | hasNextPage api doc = Just $ Illust $ page+1
   | otherwise = Nothing
-getNextPage api@(Like page) doc
+nextPage api@(Like page) doc
   | hasNextPage api doc = Just $ Like $ page+1
   | otherwise = Nothing
-getNextPage api@(Fav s page) doc
+nextPage api@(Fav s page) doc
   | hasNextPage api doc = Just $ Fav s $ page+1
   | otherwise = Nothing
-getNextPage api@(Search str sort page) doc
+nextPage api@(Search str sort page) doc
   | hasNextPage api doc = Just $ Search str sort $ page+1
   | otherwise = Nothing
-getNextPage api@(UserBookmark user page) doc
+nextPage api@(UserBookmark user page) doc
   | hasNextPage api doc = Just $ UserBookmark user $ page+1
   | otherwise = Nothing
-getNextPage _ _ = Nothing
+nextPage _ _ = Nothing
 
 hasNextPage :: ListAPI -> XML.Document -> Bool
 hasNextPage api doc = go api
