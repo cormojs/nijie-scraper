@@ -7,6 +7,7 @@ module Web.Nijie
        , saveTopIllust
        , illustUrls
        , postBookmarkAdd
+       , postBookmarkUpdate
        , postNuitaAdd
        , rightAuthor
        , tags
@@ -14,6 +15,7 @@ module Web.Nijie
        , nextPage
        , size
        , toggleSortAPI
+       , bookmarkFolders
        ) where
 
 
@@ -91,7 +93,10 @@ toggleSortAPI api = api
 
 ---
 -- add an illust to your bookmarks
-postBookmarkAdd (Link { illustId = id }) = postForm id $ FavAdd  id
+postBookmarkAdd tag (Link { illustId = id }) = postForm id $ FavAdd tag id
+postBookmarkUpdate tag (Link { illustId = id }) = do
+  bid <- bookmarkId <$> (document $ BookmarkEdit id)
+  postForm id $ FavUpdate tag id bid
 postNuitaAdd    (Link { illustId = id }) = postForm id $ NuiAdd  id
 postGoodAdd     (Link { illustId = id }) = postForm id $ GoodAdd id
 

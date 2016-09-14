@@ -42,6 +42,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans as Trans
 import Control.Applicative ((<$>))
 
+import Debug.Trace (trace)
 
 description :: XML.Document -> String
 description doc =
@@ -50,6 +51,12 @@ description doc =
             &// XMLC.attributeIs "class" "m-bottom15"
       descs = XMLC.child s >>= XMLC.content
   in Text.unpack $ Text.concat descs
+
+bookmarkId :: XML.Document -> ByteString
+bookmarkId doc =
+  let [elem] = XMLC.fromDocument doc
+              $// XMLC.attributeIs "name" "bookmark_id"
+  in TextEnc.encodeUtf8 $ head $ XMLC.attribute "value" elem
 
 tags :: XML.Document -> [ByteString]
 tags doc =
@@ -74,6 +81,8 @@ links api doc = case go api of
                       &// XMLC.attributeIs "class" "nijie mozamoza illust_list"
         go (Fav _ _)  = map njeBookmarkCursorToNjeLink $ cursor
                         $// XMLC.attributeIs "class" "nijie-bookmark"
+        go (FavFolder _ _ _ _)  = map njeBookmarkCursorToNjeLink $ cursor
+                                  $// XMLC.attributeIs "class" "nijie-bookmark"
         go (Rank _) = map njeOkazuCursorToNjeLink $ cursor
                          $// XMLC.attributeIs "id" "okazu_list"
                          &// XMLC.element "a"
@@ -88,6 +97,20 @@ links api doc = case go api of
                                $// XMLC.attributeIs "id" "main-left-main"
                                &// XMLC.attributeIs "class" "nijie mozamoza illust_list"
         cursor = XMLC.fromDocument doc
+
+bookmarkFolders :: XML.Document -> [ListAPI]
+bookmarkFolders doc =
+  map cursorToList $ (XMLC.fromDocument doc)
+  $// XMLC.attributeIs "id" "main-right"
+  &// XMLC.attributeIs "id" "pro"
+  &// XMLC.attributeIs "class" "bookmark_sort_list  "
+  where cursorToList cursor =
+          let [link] = cursor $// XMLC.element "a"
+              [url]  = XMLC.attribute "href" link
+              [nameText] = XMLC.content $ head $ XMLC.child link
+              [id]   = XMLC.attribute "tag_id" cursor
+              name = TextEnc.encodeUtf8 $ Text.strip nameText
+          in FavFolder name (TextEnc.encodeUtf8 id) FavAsc 1
 
 size :: ListAPI -> XML.Document -> Int
 size api doc = go api

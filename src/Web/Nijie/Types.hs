@@ -67,7 +67,8 @@ data Login = Login { email    :: ByteString
 
 -- API
 data PostAPI =
-    FavAdd ByteString
+    FavAdd ByteString ByteString
+  | FavUpdate ByteString ByteString ByteString
   | NuiAdd ByteString
   | GoodAdd ByteString
   deriving (Eq, Show)
@@ -75,11 +76,16 @@ data PostAPI =
 data ViewAPI =
     View ByteString
   | ViewPopup ByteString
+  | BookmarkEdit ByteString
   deriving (Eq, Show)
+
+type Title = ByteString
+type Id = ByteString
 
 data ListAPI =
     Like Page
   | Fav FavSort Page
+  | FavFolder Title Id FavSort Page
   | Rank RankType
   | UserIllust User
   | UserBookmark User Page
@@ -92,15 +98,19 @@ class API api where
 
 instance API PostAPI where
   convertAPIToQuery api = case api of
-    FavAdd id -> ("bookmark_add",   [ ("tag", "")
-                                    , ("id", id) ])
+    FavAdd tag id -> ("bookmark_add",   [ ("tag", tag)
+                                        , ("id", id) ])
+    FavUpdate tag id bid -> ("bookmark_update", [ ("tag", tag)
+                                                , ("id", id)
+                                                , ("bookmark_id", bid )])
     NuiAdd id -> ("php/ajax/add_nuita", [("id", id) ])
     GoodAdd id -> ("php/ajax/add_good", [("id", id) ])
 
 instance API ViewAPI where
   convertAPIToQuery api = case api of
-    View id   -> ("view",           [ ("id", id) ])
-    ViewPopup id -> ("view_popup",  [ ("id", id) ])
+    BookmarkEdit id -> ("bookmark_edit", [ ("id", id) ])
+    View id   ->       ("view",           [ ("id", id) ])
+    ViewPopup id ->    ("view_popup",  [ ("id", id) ])
 
 instance API ListAPI where
   convertAPIToQuery api = case api of
@@ -108,6 +118,9 @@ instance API ListAPI where
     Like p    -> ("like_user_view", [ ("p", ps p) ])
     Fav s p   -> ("okiniiri",       [ ("p", ps p)
                                       , ("sort", ps s) ])
+    FavFolder _ id s p -> ("okiniiri", [ ("id", id)
+                                       , ("p", ps p)
+                                       , ("sort", ps s)])
     Rank typ  -> ("okazu",          [ ("type", ps typ) ])
     UserIllust user -> ("members_illust", [("id", userId user) ])
     UserBookmark user p ->
