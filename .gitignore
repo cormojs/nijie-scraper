@@ -1,2 +1,13 @@
+<<<<<<< HEAD
 .stack-work/*
 *~
+=======
+*.o
+*.hi
+*.html
+*.json
+cabal.sandbox.config
+.cabal-sandbox/
+*~
+dist/
+>>>>>>> 0d16809fb17923ec25bdb59f993c5ce24481a9cd
